@@ -3,46 +3,55 @@ import telebot
 from flask import Flask, request
 from google import genai
 
-# Змінні з налаштувань Vercel
+# Налаштування
 TOKEN = os.getenv("8328585321:AAFoNYLKLvX_lHxf91qcPb8Fdj0Uw608zvI")
-GEMINI_KEY = os.getenv("AIzaSyC8nMCdo2SQn2HrpVxkt7T0_PjSPexZhW0")
+API_KEY = os.getenv("AIzaSyC8nMCdo2SQn2HrpVxkt7T0_PjSPexZhW0")
 
 bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(name)
 
-# Створення клієнта Gemini
-client = genai.Client(api_key=GEMINI_KEY)
+# Спробуємо ініціалізувати Gemini
+def get_client():
+    return genai.Client(api_key=API_KEY)
 
 @app.route('/', methods=['GET', 'POST'])
-def webhook():
+def index():
     if request.method == 'POST':
         update = telebot.types.Update.de_json(request.get_data().decode('utf-8'))
         bot.process_new_updates([update])
-        return "OK", 200
-    return "Бот працює!", 200
+        return 'OK', 200
+    return '<h1>Бот онлайн!</h1>', 200
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    prompt = message.text
-    status = bot.reply_to(message, "🎨 Малюю... зачекайте")
+    if not message.text:
+        return
+        
+    wait_msg = bot.reply_to(message, "🎨 Малюю ваш запит через Nano Banana...")
     
     try:
-        # Використовуємо актуальну модель Nano Banana
+        client = get_client()
+        # Використовуємо модель 2.0 Flash
         response = client.models.generate_content(
-            model="gemini-2.0-flash", 
-            contents=[prompt]
+            model="gemini-2.0-flash",
+            contents=[message.text]
         )
         
-        # Шукаємо картинку в результаті
-        for part in response.candidates[0].content.parts:
-            if part.inline_data:
-                bot.send_photo(message.chat.id, part.inline_data.data)
-                bot.delete_message(message.chat.id, status.message_id)
-                return
+        found = False
+        if response.candidates and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                if part.inline_data:
+                    bot.send_photo(message.chat.id, part.inline_data.data)
+                    bot.delete_message(message.chat.id, wait_msg.message_id)
+                    found = True
+                    break
         
-        bot.edit_message_text("ШІ не зміг створити фото за цим описом.", message.chat.id, status.message_id)
+        if not found:
+            bot.edit_message_text("ШІ не зміг згенерувати картинку. Спробуйте інший опис.", message.chat.id, wait_msg.message_id)
+            
     except Exception as e:
-        bot.edit_message_text(f"Помилка: {str(e)}", message.chat.id, status.message_id)
+        bot.edit_message_text(f"❌ Помилка: {str(e)}", message.chat.id, wait_msg.message_id)
 
-if name == "main":
-    app.run()
+# Це важливо для Vercel Python Runtime
+def handler(request):
+    return app(request)
