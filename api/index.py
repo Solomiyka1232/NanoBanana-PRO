@@ -8,8 +8,8 @@ TOKEN = '8328585321:AAFoNYLKLvX_lHxf91qcPb8Fdj0Uw608zvI'
 # Ключ Gemini краще брати з налаштувань, але якщо хочеш, впиши замість os.environ.get
 GEMINI_KEY = os.environ.get('AIzaSyC8nMCdo2SQn2HrpVxkt7T0_PjSPexZhW0')
 
-# ОПЕЧАТКА БУЛА ТУТ: має бути name
-app = Flask(name)
+# ОПЕЧАТКА БУЛА ТУТ: має бути __name__
+app = Flask(__name__)
 
 # Ініціалізація бота
 bot = telebot.TeleBot(TOKEN, threaded=False)
